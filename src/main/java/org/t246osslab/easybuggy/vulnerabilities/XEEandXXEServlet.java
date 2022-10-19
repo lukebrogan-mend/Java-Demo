@@ -1,6 +1,7 @@
 package org.t246osslab.easybuggy.vulnerabilities;
 
 import java.io.File;
+import io.whitesource.cure.FileSecurityUtils;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -194,6 +195,10 @@ public class XEEandXXEServlet extends AbstractServlet {
         SAXParser parser;
         try {
             File file = new File(savePath + File.separator + fileName);
+            if (FileSecurityUtils.isFileOutsideDir(file.toString(), savePath + File.separator)) {
+                //TODO: Handle exception
+                throw new RuntimeException("Possible PathTraversal attack detected");
+            }
             SAXParserFactory spf = SAXParserFactory.newInstance();
             if ("/xee".equals(req.getServletPath())) {
                 customHandler.setInsert();
