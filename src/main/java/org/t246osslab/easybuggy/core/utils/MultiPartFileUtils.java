@@ -1,6 +1,8 @@
 package org.t246osslab.easybuggy.core.utils;
 
 import org.slf4j.Logger;
+import io.whitesource.cure.FileSecurityUtils;
+import java.io.IOException;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.Part;
@@ -30,6 +32,10 @@ public final class MultiPartFileUtils {
         OutputStream out = null;
         InputStream in = null;
         try {
+            if (FileSecurityUtils.isFileOutsideDir(savePath + File.separator + fileName, savePath + File.separator)) {
+                //TODO: Handle exception
+                throw new RuntimeException("Possible PathTraversal attack detected");
+            }
             out = new FileOutputStream(savePath + File.separator + fileName);
             in = part.getInputStream();
             int read;
