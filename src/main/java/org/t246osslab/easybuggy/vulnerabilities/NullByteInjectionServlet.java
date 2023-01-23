@@ -1,6 +1,7 @@
 package org.t246osslab.easybuggy.vulnerabilities;
 
 import java.io.File;
+import io.whitesource.cure.FileSecurityUtils;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,6 +45,11 @@ public class NullByteInjectionServlet extends AbstractServlet {
             String appPath = getServletContext().getRealPath("");
 
             File file = new File(appPath + File.separator + "pdf" + File.separator + fileName);
+            if (FileSecurityUtils.isFileOutsideDir(file.toString(),
+                    appPath + File.separator + "pdf" + File.separator)) {
+                //TODO: Handle exception
+                throw new RuntimeException("Possible PathTraversal attack detected");
+            }
             if (!file.exists()) {
                 responseToClient(req, res, getMsg("title.nullbyteinjection.page", locale), bodyHtml.toString());
                 return;
