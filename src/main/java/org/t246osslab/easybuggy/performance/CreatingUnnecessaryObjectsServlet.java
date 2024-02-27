@@ -1,6 +1,7 @@
 package org.t246osslab.easybuggy.performance;
 
 import java.io.IOException;
+import io.whitesource.cure.Encoder;
 import java.util.Locale;
 
 import javax.servlet.ServletException;
@@ -25,7 +26,8 @@ public class CreatingUnnecessaryObjectsServlet extends AbstractServlet {
         bodyHtml.append(getMsg("msg.calc.sym.natural.numbers", locale));
         bodyHtml.append("<br><br>n = ");
         if (number > 0) {
-            bodyHtml.append("<input type=\"text\" name=\"number\" size=\"9\" maxlength=\"9\" value=" + strNumber + ">");
+            Encoder.forHtmlContentXss(bodyHtml
+					.append("<input type=\"text\" name=\"number\" size=\"9\" maxlength=\"9\" value=" + strNumber + ">"));
         } else {
             bodyHtml.append("<input type=\"text\" name=\"number\" size=\"9\" maxlength=\"9\">");
         }

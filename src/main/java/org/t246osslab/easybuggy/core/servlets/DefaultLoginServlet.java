@@ -1,177 +1,93 @@
-package org.t246osslab.easybuggy.core.servlets;
+package org.t246osslab.easybuggy.performance;
 
 import java.io.IOException;
-import java.util.Date;
-import java.util.Enumeration;
+import io.whitesource.cure.Encoder;
 import java.util.Locale;
-import java.util.concurrent.ConcurrentHashMap;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 
-import org.apache.commons.lang.StringUtils;
-import org.apache.directory.server.core.filtering.EntryFilteringCursor;
-import org.apache.directory.shared.ldap.filter.ExprNode;
-import org.apache.directory.shared.ldap.filter.FilterParser;
-import org.apache.directory.shared.ldap.filter.SearchScope;
-import org.apache.directory.shared.ldap.message.AliasDerefMode;
-import org.apache.directory.shared.ldap.name.LdapDN;
-import org.t246osslab.easybuggy.core.dao.EmbeddedADS;
-import org.t246osslab.easybuggy.core.model.User;
-import org.t246osslab.easybuggy.core.utils.ApplicationUtils;
+import org.apache.commons.lang.math.NumberUtils;
+import org.t246osslab.easybuggy.core.servlets.AbstractServlet;
 
 @SuppressWarnings("serial")
-@WebServlet(urlPatterns = { "/login" })
-public class DefaultLoginServlet extends AbstractServlet {
-    
-    /* User's login history using in-memory account locking */
-    private static ConcurrentHashMap<String, User> userLoginHistory = new ConcurrentHashMap<String, User>();
-    
-    @Override
-    public void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+@WebServlet(urlPatterns = { "/createobjects" })
+public class CreatingUnnecessaryObjectsServlet extends AbstractServlet {
 
+    @Override
+    protected void service(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         Locale locale = req.getLocale();
+        String strNumber = req.getParameter("number");
+        int number = NumberUtils.toInt(strNumber, -1);
         StringBuilder bodyHtml = new StringBuilder();
-
-        bodyHtml.append("<p>" + getMsg("msg.need.admin.privilege", locale) + "</p>");
-        bodyHtml.append("<form method=\"POST\" action=\"" + req.getRequestURI() + "\">");
-        bodyHtml.append("<table width=\"400px\" height=\"150px\">");
-        bodyHtml.append("<tr>");
-        bodyHtml.append("<td>" + getMsg("label.user.id", locale) + " :&nbsp;</td>");
-        bodyHtml.append("<td><input type=\"text\" name=\"userid\" size=\"20\"></td>");
-        bodyHtml.append("</tr>");
-        bodyHtml.append("<tr>");
-        bodyHtml.append("<td>" + getMsg("label.password", locale) + " :&nbsp;</td>");
-        bodyHtml.append("<td><input type=\"password\" name=\"password\" size=\"20\" autocomplete=\"off\"></td>");
-        bodyHtml.append("</tr>");
-        bodyHtml.append("<tr>");
-        bodyHtml.append("<td></td>");
-        bodyHtml.append("<td><input type=\"submit\" value=\"" + getMsg("label.login", locale) + "\"></td>");
-        bodyHtml.append("</tr>");
-        bodyHtml.append("</table>");
-        String queryString = req.getQueryString();
-        if (queryString != null) {
-            bodyHtml.append("<input type=\"hidden\" name=\"loginquerystring\" value=\""
-                    + encodeForHTML(queryString) + "\">");
-        }
-        Enumeration<?> paramNames = req.getParameterNames();
-        while (paramNames.hasMoreElements()) {
-            String paramName = (String) paramNames.nextElement();
-            String[] paramValues = req.getParameterValues(paramName);
-            for (String paramValue : paramValues) {
-                bodyHtml.append("<input type=\"hidden\" name=\"" + encodeForHTML(paramName)
-                        + "\" value=\"" + encodeForHTML(paramValue) + "\">");
-            }
-        }
-
-        HttpSession session = req.getSession(true);
-        String authNMsg = (String) session.getAttribute("authNMsg");
-        if (authNMsg != null && !"authenticated".equals(authNMsg)) {
-            bodyHtml.append(authNMsg);
-            session.setAttribute("authNMsg", null);
-        }
-        if (req.getAttribute("login.page.note") != null) {
-            bodyHtml.append(getInfoMsg((String) req.getAttribute("login.page.note"), locale));
-        }
-        bodyHtml.append("</form>");
-        responseToClient(req, res, getMsg("title.login.page", locale), bodyHtml.toString());
-    }
-
-    @Override
-    public void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
-        Locale locale = req.getLocale();
-        String userid = StringUtils.trim(req.getParameter("userid"));
-        String password = StringUtils.trim(req.getParameter("password"));
-
-        HttpSession session = req.getSession(true);
-        if (isAccountLocked(userid)) {
-            session.setAttribute("authNMsg", getErrMsg("msg.authentication.fail", locale));
-        } else if (authUser(userid, password)) {
-            /* Reset account lock count */
-            resetAccountLock(userid);
-
-            session.setAttribute("authNMsg", "authenticated");
-            session.setAttribute("userid", userid);
-            
-            String target = (String) session.getAttribute("target");
-            if (target == null) {
-                res.sendRedirect("/admins/main");
-            } else {
-                session.removeAttribute("target");
-                res.sendRedirect(target);
-            }
-            return;
+        bodyHtml.append("<form action=\"createobjects\" method=\"post\">");
+        bodyHtml.append(getMsg("msg.calc.sym.natural.numbers", locale));
+        bodyHtml.append("<br><br>n = ");
+        if (number > 0) {
+            Encoder.forHtmlContentXss(bodyHtml
+					.append("<input type=\"text\" name=\"number\" size=\"9\" maxlength=\"9\" value=" + strNumber + ">"));
         } else {
-            /* account lock count +1 */
-            session.setAttribute("authNMsg", getErrMsg("msg.authentication.fail", locale));
+            bodyHtml.append("<input type=\"text\" name=\"number\" size=\"9\" maxlength=\"9\">");
         }
-        incrementLoginFailedCount(userid);
-        doGet(req, res);
-    }
-
-    protected void incrementLoginFailedCount(String userid) {
-        User admin = getUser(userid);
-        admin.setLoginFailedCount(admin.getLoginFailedCount() + 1);
-        admin.setLastLoginFailedTime(new Date());
-    }
-
-    protected void resetAccountLock(String userid) {
-        User admin = getUser(userid);
-        admin.setLoginFailedCount(0);
-        admin.setLastLoginFailedTime(null);
-    }
-
-    protected boolean isAccountLocked(String userid) {
-        User admin = userLoginHistory.get(userid);
-        return (admin != null
-                && admin.getLoginFailedCount() >= ApplicationUtils.getAccountLockCount()
-                && (new Date().getTime() - admin.getLastLoginFailedTime().getTime() < ApplicationUtils
-                        .getAccountLockTime()));
-    }
-
-    protected boolean authUser(String uid, String password) {
-        
-        if (uid == null || password == null) {
-            return false;
-        }
-        ExprNode filter;
-        EntryFilteringCursor cursor = null;
-        try {
-            filter = FilterParser.parse("(&(uid=" + encodeForLDAP(uid.trim())
-                    + ")(userPassword=" + encodeForLDAP(password.trim()) + "))");
-            cursor = EmbeddedADS.getAdminSession().search(new LdapDN("ou=people,dc=t246osslab,dc=org"),
-                    SearchScope.SUBTREE, filter, AliasDerefMode.NEVER_DEREF_ALIASES, null);
-            if (cursor.available()) {
-                return true;
+        bodyHtml.append("<br><br>");
+        if (number > 0) {
+            switch (number) {
+            case 1:
+                break;
+            case 2:
+                bodyHtml.append("1 + 2 = ");
+                break;
+            case 3:
+                bodyHtml.append("1 + 2 + 3 = ");
+                break;
+            case 4:
+                bodyHtml.append("1 + 2 + 3 + 4 = ");
+                break;
+            case 5:
+                bodyHtml.append("1 + 2 + 3 + 4 + 5 = ");
+                break;
+            default:
+                bodyHtml.append("1 + 2 + 3 + ... + " + number + " = ");
+                bodyHtml.append("\\(\\begin{eqnarray}\\sum_{ k = 1 }^{ " + number + " } k\\end{eqnarray}\\) = ");
             }
-        } catch (Exception e) {
-            log.error("Exception occurs: ", e);
-        } finally {
-            if (cursor != null) {
-                try {
-                    cursor.close();
-                } catch (Exception e) {
-                    log.error("Exception occurs: ", e);
-                }
-            }
+        } else {
+            bodyHtml.append("1 + 2 + 3 + ... + n = ");
+            bodyHtml.append("\\(\\begin{eqnarray}\\sum_{ k = 1 }^{ n } k\\end{eqnarray}\\) = ");
         }
-        return false;
+        if (number >= 1) {
+            long start = System.nanoTime();
+            bodyHtml.append(calcSum1(number));
+            log.info("{} ms", (System.nanoTime() - start) / 1000000f);
+        }
+        bodyHtml.append("<br><br>");
+        bodyHtml.append("<input type=\"submit\" value=\"" + getMsg("label.calculate", locale) + "\">");
+        bodyHtml.append("<br><br>");
+        bodyHtml.append(getInfoMsg("msg.note.createobjects", locale));
+        bodyHtml.append("</form>");
+
+        responseToClient(req, res, getMsg("title.createobjects.page", locale), bodyHtml.toString());
     }
 
-    private User getUser(String userid) {
-        User admin = userLoginHistory.get(userid);
-        if (admin == null) {
-            User newAdmin = new User();
-            newAdmin.setUserId(userid);
-            admin = userLoginHistory.putIfAbsent(userid, newAdmin);
-            if (admin == null) {
-                admin = newAdmin;
-            }
+    private Long calcSum1(int number) {
+        Long sum = 0L;
+        for (long i = 1; i <= number; i++) {
+            sum += i;
         }
-        return admin;
+        return sum;
+    }
+/*
+    private long calcSum2(int number) {
+        long sum = 0L;
+        for (int i = 1; i <= number; i++) {
+            sum += i;
+        }
+        return sum;
     }
 
+    private long calcSum3(int number) {
+        return (long) number * (number + 1) / 2;
+    }
+*/
 }
